@@ -242,13 +242,29 @@ torch.set_float32_matmul_precision('high')
 
 # get logits
 model = GPT(GPTConfig(vocab_size=50304))
-model.to(device, dtype=torch.bfloat16)
-# model = model.to(torch.bfloat16)
-torch.compile(model)
+model.to(device)
+model = model.to(torch.bfloat16)
+
+max_lr = 6e-4
+min_lr = max_lr * 0.1
+warmup_steps = 10
+max_steps = 50
+def get_lr(it):
+    # 1) linear warmup for warmup_iters steps
+    if it < warmup_steps:
+        return max_lr * (it+1) / warmup_steps
+    # 2) if it > lr_decay_iters, return min learning rate
+    if it > max_steps:
+        return min_lr
+    # 3) in between, use consine decay down to min learning rate
+    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coef starts at 1 and goes to 0
+    return min_lr + coeff * (max_lr - min_lr)
 
 # optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
-for i in range(50):
+for step in range(max_steps):
     t0 = time.time()
     x, y = train_loader.next_batch()
     x, y = x.to(device), y.to(device)
@@ -259,13 +275,18 @@ for i in range(50):
     # import code; code.interact(local=locals())
     loss.backward() # backword adds to gradiant, deposits the gradiants
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-    optimizer.step() # update the paramters to decrease the loss.
 
+    # determine and set the learning rate for this iteration
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+    optimizer.step() # update the paramters to decrease the loss.
     torch.mps.synchronize()
     t1 = time.time()
     dt = (t1 - t0)*1000 # time difference in milliseconds
     tokens_per_sec = (train_loader.B * train_loader.T) / (t1 - t0)
-    print(f"step {i}, loss: {loss.item()}, norm: {norm:.4f}, dt: {dt:.2f}ms, tok/sec: {tokens_per_sec:.2f}") # .item will convert to a single float.
+    print(f"step {step:4d} | loss: {loss.item():.6f} | lr {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f}ms | tok/sec: {tokens_per_sec:.2f}") # .item will convert to a single float.
 
 import sys; sys.exit(0)
 
