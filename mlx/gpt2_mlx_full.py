@@ -21,7 +21,7 @@ lr = 1e-3
 
 
 ### Tokenization
-with open('./input.txt', 'r', encoding='utf-8') as f:
+with open('../input.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 vocab = sorted(list(set(text)))
 vocab_size = len(vocab)
@@ -188,7 +188,7 @@ for epoch in range(num_epochs):
         loss = loss_fn(model, input, label)
         running_loss += loss.item()
     avg_val_loss = running_loss / batch_cnt
-    print(f"Epoch {epoch:2} | train = {avg_train_loss:.4f} | val = {avg_val_loss:.4f}")
+    print(f"Epoch {epoch:2} | loss = {loss.item():.4f} | avg train loss = {avg_train_loss:.4f} | val loss = {avg_val_loss:.4f}")
 
 ### Inference
 completion = decode(model.generate(1000)[0].tolist())
