@@ -101,7 +101,7 @@ class GPT(nn.Module):
             h = nn.ModuleList(Block(config) for _ in range(config.n_layer)),
             ln_f = nn.LayerNorm(config.n_embd),
         ))
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False) # language model head for output tokens
 
         # weight sharing scheme
         self.transformer.wte.weight = self.lm_head.weight
